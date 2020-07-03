@@ -1,4 +1,4 @@
-import discord,datetime,time,os,pymongo,dns,keep_alive
+import discord,datetime,time,os,pymongo,dns
 from discord.ext import commands, tasks
 from itertools import cycle
 
@@ -159,7 +159,6 @@ async def shutdown_error(ctx,error):
   if isinstance(error,commands.MissingPermissions):
     await ctx.send("Sorry, Only my owner, Venimental#1289 can use this command")
   
-keep_alive.keep_alive()
 
 token=os.environ.get("botsecret")
 bot.run(token, reconnect=True)
