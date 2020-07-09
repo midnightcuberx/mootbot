@@ -124,12 +124,12 @@ class Mod(commands.Cog):
     if not member:
       await ctx.send("You need to enter a member to mute!")
       return
-    role = discord.utils.get(ctx.guild.roles, name='venimute')
+    role = discord.utils.get(ctx.guild.roles, name='mootmoot')
     if role !=None:
       await member.add_roles(role)
       await ctx.send(f"{member.mention} has successfully been muted for {reason}")
     elif not role:
-      venimute = await guild.create_role(name="venimute")
+      venimute = await guild.create_role(name="mootmoot")
       for channel in ctx.guild.text_channels:
         await channel.set_permissions(venimute,send_messages=False)
       await member.add_roles(venimute)
@@ -164,7 +164,7 @@ class Mod(commands.Cog):
     elif isinstance(error,commands.BotMissingPermissions):
       await ctx.send("I do not have permission to unmute people!")
     else:
-      await ctx.send("You need to have a venimute role in order to unmute someone")
+      await ctx.send("You need to have a mootmoot role in order to unmute someone")
 
 def setup(bot):
   bot.add_cog(Mod(bot))
