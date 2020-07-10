@@ -9,6 +9,51 @@ class Mod(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
+  @commands.command()
+  @commands.has_permissions(manage_roles=True)
+  async def warn(self,ctx,member:discord.Member,*,reason):
+    collection=db["warns"]
+    serverwarns=collection.find_one({"_id":ctx.guild.id})
+
+    list1=[]
+    try:
+      a=serverwarns[str(member.id)]
+      memberwarns=serverwarns[str(member.id)]
+      for key,value in sorted(memberwarns.items(),reverse=False, key=lambda item:item[0]):
+        list1.append(key)
+      numofwarns=int(list1[-1])
+    except (KeyError,TypeError):
+      serverwarns[str(member.id)]={}
+      numofwarns=0
+
+    numofwarns+=1
+    serverwarns[str(member.id)][str(numofwarns)]=reason
+    userwarns=serverwarns[str(member.id)]
+    collection.update_one({"_id":ctx.guild.id},{"$set":{str(member.id):userwarns}})
+    await ctx.send(f"{member} has been wanred for {reason}")
+
+  @commands.command()
+  async def warns(self,ctx,member:discord.Member):
+    collection=db["warns"]
+    serverwarns=collection.find_one({"_id":ctx.guild.id})
+    if not serverwarns[str(member.id)]:
+      await ctx.send("This user has no warnings in this server")
+      return
+    userwarns=serverwarns[str(member.id)]
+    embed=discord.Embed(title=f"Warns for {member} in {ctx.guild}")
+    for key,value1 in sorted(userwarns.items(),reverse=False, key=lambda item:item[0]):
+      embed.add_field(name=f"#{key}",value=f"{value1}")
+    await ctx.send(embed=embed)
+  
+  @commands.command()
+  @commands.is_owner()
+  async def warnsetup(self,ctx):
+    collection=db["warns"]
+    for guild in self.bot.guilds:
+      collection.insert_one({"_id":guild.id})
+    await ctx.send("done")
+
+    
 
   @commands.command()
   @commands.has_permissions(ban_members=True)
@@ -28,7 +73,7 @@ class Mod(commands.Cog):
     elif isinstance(error,commands.BotMissingPermissions):
       await ctx.send("I do not have permission to ban that user!")
 
-      
+  '''    
   @commands.command()
   @commands.has_permissions(manage_messages=True)
   async def invitetoggle(self,ctx,onoff=None):
@@ -57,7 +102,7 @@ class Mod(commands.Cog):
   async def invitetoggle_error(self,ctx,error):
     if isinstance(error,commands.MissingPermissions):
       await ctx.send("You can only use this command if you have the manage messages permission!")
-    
+  '''  
 
   @commands.command()
   @commands.has_permissions(kick_members=True)
