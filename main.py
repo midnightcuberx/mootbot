@@ -28,7 +28,7 @@ start_time=time.time()
 
 bot = commands.Bot(command_prefix= ";")
 
-status=cycle(["with Rubiks cubes",";help", "with raiders","with corona","with myself","with my gf","with your mum","with cubers discord","depression","balance is the key to life","cat and mouse with raiders"])
+status=cycle([";help", "cat and mouse with raiders"])
 
 @tasks.loop(seconds=10)
 async def change_status():
@@ -48,6 +48,8 @@ async def on_guild_join(guild):
   collection.insert_one({"_id":guild.id,"prefix":";"})
   collection=db["invites"]
   collection.insert_one({"_id":guild.id,"mode":"off"})
+  collection=db["warns"]
+  collection.insert_one({"_id":guild.id})
 
 @bot.event
 async def on_guild_remove(guild):
