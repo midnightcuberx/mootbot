@@ -9,9 +9,102 @@ class Mod(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
+
+  @commands.command()
+  async def test(self,ctx,channel:discord.TextChannel):
+    await ctx.send(channel.id)
+  @commands.command()
+  @commands.has_permissions(manage_guild=True)
+  async def setup(self,ctx,onoff="on"):
+    onoff=onoff.lower()
+    if onoff=="off":
+      await ctx.send("Successfully switched raid protection off")
+      time=0
+      dorw="d"
+    if onoff !="off" and onoff !="on":
+      await ctx.send("That is not a valid option! You can only switch raid protection on and off!")
+      return
+    elif onoff=="on":
+      await ctx.send("Succefully switched raid protection on")
+      await ctx.send("What is the minimum age an account needs to be to pass the raid protection procedure? Answer with a whole number of days or weeks in this format: `<number> <d/w>`")
+      intdays=False
+      corform=False
+      while intdays is False or corform is False:
+        message = await self.bot.wait_for('message', check=lambda message: message.author.id == ctx.author.id)
+        try:
+          time,dorw=message.content.lower().split(" ")
+          corform=True
+        except ValueError:
+          print("Please enter the amount of days/weeks in a valid format!")
+        try:
+          time=int(time)
+          if dorw!= "d" and dorw!="w":
+            await ctx.send("Please enter in the format of <number> <d/w>!")
+            intdays=False
+          if time<1:
+            await ctx.send("Please try again, that is an invalid number of days/weeks")
+          elif time>=1 and intdays is True:
+            intdays=True
+        except (ValueError,UnboundLocalError):
+          await ctx.send("That is not a valid number of days/weeks! Please enter again!")
+        
+      await ctx.send("Finally, what is the message you would like to send to a new member if their account is new?")
+      message = await self.bot.wait_for('message', check=lambda message: message.author.id == ctx.author.id)
+      await ctx.send(f"Ok done! Your message to them will be {message.content}")
+
+
+    
+    time=time*86400
+    if dorw=="w":
+      time=time*7
+
+    collection=db["raidprotection"]
+    collection.update_one({"_id":ctx.guild.id},{"$set":{"seconds":time}})
+    collection.update_one({"_id":ctx.guild.id},{"$set":{"message":message.content}})
+
+  @setup.error
+  async def setup_error(self,ctx,error):
+    if isinstance(error,commands.MissingPermissions):
+      await ctx.send("You need manage server permissions to run this command!")
+    else:
+      raise error
+
+  @commands.command()
+  @commands.is_owner()
+  async def raidsetup(self,ctx):
+    collection=db["raidprotection"]
+    for guild in self.bot.guilds:
+      collection.insert_one({"_id":guild.id,"seconds":0,"message":"None"})
+
+  @commands.command(aliases=["logs","log"])
+  @commands.has_permissions(manage_guild=True)
+  async def logsetup(self,ctx,channel:discord.TextChannel=None):
+    if not channel:
+      await ctx.send("You must enter a channel!")
+      return
+    collection=db["logs"]
+    collection.update_one({"_id":ctx.guild.id},{"$set":{"channel":channel.id}})
+    await ctx.send(f"You have set your logging channel to {channel}")
+
+  @commands.command()
+  @commands.has_permissions(manage_guild=True)
+  async def logtoggle(self,ctx,onoff="on"):
+    onoff=onoff.lower()
+    if onoff!="on" and onoff !="off":
+      await ctx.send("Please enter on or off!")
+      return
+    collection=db["logs"]
+    collection.update_one({"_id":ctx.guild.id},{"$set":{"mode":onoff}})
+    await ctx.send("You have toggled logs to" + onoff)
+
+
+
   @commands.command()
   @commands.has_permissions(manage_roles=True)
-  async def warn(self,ctx,member:discord.Member,*,reason):
+  async def warn(self,ctx,member:discord.Member=None,*,reason="no reason"):
+    if not member:
+      await ctx.send("You need to enter a member to warn!")
+      return
     collection=db["warns"]
     serverwarns=collection.find_one({"_id":ctx.guild.id})
 
@@ -30,13 +123,24 @@ class Mod(commands.Cog):
     serverwarns[str(member.id)][str(numofwarns)]=reason
     userwarns=serverwarns[str(member.id)]
     collection.update_one({"_id":ctx.guild.id},{"$set":{str(member.id):userwarns}})
-    await ctx.send(f"{member} has been wanred for {reason}")
+    await ctx.send(f"{member} has been warned for {reason}")
+  
+  @warn.error
+  async def warn_error(self,ctx,error):
+    if isinstance(error,commands.BadArgument):
+      await ctx.send("You need to enter a valid member!")
+    elif isinstance(error,commands.MissingPermissions):
+      await ctx.send("You need manage roles permissions to run this command!")
 
   @commands.command()
-  async def warns(self,ctx,member:discord.Member):
+  async def warns(self,ctx,member:discord.Member=None):
+    if not member:
+      member=ctx.author
     collection=db["warns"]
     serverwarns=collection.find_one({"_id":ctx.guild.id})
-    if not serverwarns[str(member.id)]:
+    try:
+      a=serverwarns[str(member.id)]
+    except KeyError:
       await ctx.send("This user has no warnings in this server")
       return
     userwarns=serverwarns[str(member.id)]
