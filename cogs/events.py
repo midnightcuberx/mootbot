@@ -1,4 +1,5 @@
 import discord,dns,pymongo,os,random,time,asyncio
+import datetime as date
 from discord.ext import commands
 from datetime import datetime
 
@@ -41,6 +42,15 @@ class Events(commands.Cog):
         timenow=datetime.utcnow()
         embed=discord.Embed(title=f"{member} has joined the server",description=f"{member} has joined the server",color=0xffff00,timestamp=timenow)
         embed.set_thumbnail(url=member.avatar_url)
+        difference=current_time-member_created
+        collection=db["raidprotection"]
+        guildsettings=collection.find_one({"_id":member.guild.id})
+        seconds=guildsettings["seconds"]
+        if member.guild.id==431906396032991232:
+          seconds=1814400
+        if difference<seconds:
+          days=round(difference/86400)
+          embed.add_field(name="⚠️ Warning!",value=f"This account was created {days} days ago")
         await channel.send(embed=embed)
 
   @commands.Cog.listener()
@@ -201,18 +211,20 @@ class Events(commands.Cog):
 
   @commands.Cog.listener()
   async def on_guild_channel_create(self,channel):
+    role=discord.utils.get(channel.guild.roles,name="mootmoot")
+    await channel.set_permissions(role,send_messages=False)
     collection=db["logs"]
     a=collection.find_one({"_id":channel.guild.id})
     if a["mode"]!="on":
       return
       
-    channel=a["channel"]
-    if channel==0:
+    channels=a["channel"]
+    if channels==0:
       return
-    channel=discord.utils.get(channel.guild.channels,id=channel)
-    embed=discord.Embed(title="A channel was created in {channel.category}",description=f"{channel.mention} was created at {channel.created_at}",timestamp=datetime.utcnow())
+    channelss=discord.utils.get(channel.guild.channels,id=channels)
+    embed=discord.Embed(title=f"A channel was created in {channel.category}",description=f"{channel.mention} was created at {channel.created_at}",color=0xffff00,timestamp=datetime.utcnow())
     embed.add_field(name="Channel overwrites:",value=channel.overwrites,inline=False)
-    await channel.send(embed=embed)
+    await channelss.send(embed=embed)
 
   @commands.Cog.listener()
   async def on_guild_channel_delete(self,channel):
@@ -221,13 +233,13 @@ class Events(commands.Cog):
     if a["mode"]!="on":
       return
       
-    channel=a["channel"]
-    if channel==0:
+    channels=a["channel"]
+    if channels==0:
       return
-    channel=discord.utils.get(channel.guild.channels,id=channel)
+    channelss=discord.utils.get(channel.guild.channels,id=channels)
     embed=discord.Embed(title=f"A channel was deleted in {channel.category}", 
-    description=f"{channel.mention} was deleted at {channel.created_at}",timestamp=datetime.utcnow())
-    await channel.send(embed=embed)
+    description=f"{channel.mention} was deleted at {channel.created_at}",color=0xffff00,timestamp=datetime.utcnow())
+    await channelss.send(embed=embed)
 
   @commands.Cog.listener()
   async def on_guild_channel_update(self,before,after):
