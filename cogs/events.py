@@ -52,7 +52,7 @@ class Events(commands.Cog):
       if channel!=0:
         channel=discord.utils.get(member.guild.channels,id=channel)
         timenow=datetime.utcnow()
-        embed=discord.Embed(f"{member} has left the server",description=f"{member} has left the server",color=0xffff00,timestamp=timenow)
+        embed=discord.Embed(title=f"{member} has left the server",description=f"{member} has left the server",color=0xffff00,timestamp=timenow)
         embed.set_thumbnail(url=member.avatar_url)
         await channel.send(embed=embed)    
   '''
@@ -113,7 +113,7 @@ class Events(commands.Cog):
       embed = discord.Embed(title=f"Message edited in {after.channel}", description=f"Edit by {after.author}.",#.display_name
       colour=0xffff00,
       timestamp=datetime.utcnow())
-      embed.set_thumbnail(url=after.avatar_url)
+      embed.set_thumbnail(url=after.author.avatar_url)
       fields = [("Before", before.content, False),
       ("After", after.content, False)]
 
@@ -154,52 +154,50 @@ class Events(commands.Cog):
     collection=db["logs"]
     for guild in self.bot.guilds:
       a=collection.find_one({"_id":guild.id})
-      if a["mode"]!="on":
-        return
-      user=discord.utils.get(guild.members, id=after.id)
-      if not user:
-        pass
-      else:
-        channel=a["channel"]
-        if channel==0:
-          return
-        channel=discord.utils.get(guild.channels,id=channel)
+      if a["mode"]=="on":
+        user=discord.utils.get(guild.members, id=after.id)
+        if not user:
+          pass
+        else:
+          channel=a["channel"]
+          if channel!=0:
+            channel=discord.utils.get(guild.channels,id=channel)
 
-        if before.name != after.name:
-          embed = discord.Embed(title=f"Username change by {after}",
-          colour=0xffff00,
-          timestamp=datetime.utcnow())
-          embed.set_thumbnail(url=after.avatar_url)
-          fields = [("Before", before, False),#.name
-          ("After", after, False)]
+            if before.name != after.name:
+              embed = discord.Embed(title=f"Username change by {after}",
+              colour=0xffff00,
+              timestamp=datetime.utcnow())
+              embed.set_thumbnail(url=after.avatar_url)
+              fields = [("Before", before, False),#.name
+              ("After", after, False)]
 
-          for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
-          embed.set_thumbnail(url=after.avatar_url)
-          await channel.send(embed=embed)
+              for name, value, inline in fields:
+                embed.add_field(name=name, value=value, inline=inline)
+              embed.set_thumbnail(url=after.avatar_url)
+              await channel.send(embed=embed)
 
-        if before.discriminator != after.discriminator:
-          embed = discord.Embed(title=f"{after} changed their discriminator",
-          colour=0xffff00,
-          timestamp=datetime.utcnow())
-          embed.set_thumbnail(url=after.avatar_url)
+            if before.discriminator != after.discriminator:
+              embed = discord.Embed(title=f"{after} changed their discriminator",
+              colour=0xffff00,
+              timestamp=datetime.utcnow())
+              embed.set_thumbnail(url=after.avatar_url)
 
-          fields = [("Before", before.discriminator, False),
-                ("After", after.discriminator, False)]
+              fields = [("Before", before.discriminator, False),
+                    ("After", after.discriminator, False)]
 
-          for name, value, inline in fields:
-            embed.add_field(name=name, value=value, inline=inline)
+              for name, value, inline in fields:
+                embed.add_field(name=name, value=value, inline=inline)
 
-          await channel.send(embed=embed)
+              await channel.send(embed=embed)
 
-        if before.avatar_url != after.avatar_url:
-          embed = discord.Embed(title="Avatar change",
-          colour=self.log_channel.guild.get_member(after.id).colour,
-          timestamp=datetime.utcnow())
+            if before.avatar_url != after.avatar_url:
+              embed = discord.Embed(title="Avatar change",
+              colour=0xffff00,
+              timestamp=datetime.utcnow())
 
-          embed.set_thumbnail(url=before.avatar_url)
-          embed.set_image(url=after.avatar_url)
-          await channel.send(embed=embed)
+              embed.set_thumbnail(url=before.avatar_url)
+              embed.set_image(url=after.avatar_url)
+              await channel.send(embed=embed)
 
   @commands.Cog.listener()
   async def on_guild_channel_create(self,channel):
@@ -234,11 +232,29 @@ class Events(commands.Cog):
   @commands.Cog.listener()
   async def on_guild_channel_update(self,before,after):
     pass
-
+  
+  @commands.Cog.listener()
+  async def on_voice_state_update(self,member,before,after):
+    pass
+  
+  @commands.Cog.listener()
+  async def on_guild_emojis_update(self,guild,before,after):
+    pass
 
   @commands.Cog.listener()
   async def on_webhooks_update(self,channel):
-    pass
+    collection=db["logs"]
+    a=collection.find_one({"_id":role.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channels=a["channel"]
+    if channels==0:
+      return
+
+    channels=discord.utils.get(role.guild.channels,id=channels)
+
+    embed=discord.Embed(title="A webhook was created",description=f"A webhook was created in {channel.mention} in {channel.category}",color=0xffff00,timestamp=datetime.utcnow())
 
   @commands.Cog.listener()
   async def on_guild_role_create(self,role):
@@ -252,7 +268,6 @@ class Events(commands.Cog):
       return
 
     channel=discord.utils.get(role.guild.channels,id=channel)
-
 
     embed=discord.Embed(title="A role was created",description=f"{role.mention} was created at {role.created_at}\nPermissions: {role.permissions}",timestamp=datetime.utcnow())
     await channel.send(embed=embed)
