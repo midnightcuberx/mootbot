@@ -23,7 +23,7 @@ class Help(commands.Cog):
     b=random.randint(0, 255)
     colour = discord.Colour.from_rgb(r=r, g=g, b=b)
     if not cat:
-      embed=discord.Embed(title="Help menu for Mootbot",description=f"Prefix: `{prefix}`\nModeration: \nmute, unmute, softban, ban, kick, invitetoggle,purge",color=colour)
+      embed=discord.Embed(title="Help menu for Mootbot",description=f"Prefix: `{prefix}`\nModeration: \nmute, unmute, softban, ban, kick, warn, purge, setup (raid protection setup), warns, log, logtoggle (turns logs on or off)",color=colour)
       await ctx.send(embed=embed)
 
 def setup(bot):
