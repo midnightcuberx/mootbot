@@ -9,11 +9,35 @@ class Mod(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
 
+  @commands.command()
+  async def userinfo(self,ctx,user:discord.Member=None):
+    if not user:
+      user=ctx.message.author
+    userroles=", ".join([r.mention for r in user.roles])
+    embed = discord.Embed(title=f"User info for {user}",description="", color=0xeee657)
+    embed.add_field(name='User ID', value=user.id, inline=False)
+    embed.add_field(name='Nick', value=user.nick, inline=False)
+    embed.add_field(name='Status', value=user.status, inline=False)
+    embed.add_field(name='Game', value=user.activity, inline=False)
+    embed.add_field(name='Roles', value=userroles, inline=False)
+    embed.add_field(name='Account Created', value=user.created_at,inline=False)
+    embed.add_field(name='Join Date', value=user.joined_at,inline=False)
+    embed.set_thumbnail(url=user.avatar_url)
+    await ctx.send(embed=embed)
+  @userinfo.error
+  async def userinfo_error(self,ctx,error):
+    if isinstance(error,commands.BadArgument):
+      await ctx.send("You did not specify a valid member!")
 
   @commands.command()
-  async def test(self,ctx,channel:discord.TextChannel):
-    await ctx.send(channel.id)
-  @commands.command()
+  async def avatar(self,ctx,member : discord.Member=None):
+    if not member:
+      member=ctx.message.author
+    embed=discord.Embed(title=f"{member}'s avatar",description="", color=0xeee657)
+    embed.set_image(url=member.avatar_url)
+    await ctx.send(embed=embed)
+
+  @commands.command(aliases=["raidsetup","protectionsetup"])
   @commands.has_permissions(manage_guild=True)
   async def setup(self,ctx,onoff="on"):
     onoff=onoff.lower()
@@ -35,22 +59,22 @@ class Mod(commands.Cog):
           time,dorw=message.content.lower().split(" ")
           corform=True
         except ValueError:
-          print("Please enter the amount of days/weeks in a valid format!")
+          pass
+          #await ctx.send("Please enter the amount of days/weeks in a valid format!")
         try:
           time=int(time)
-          if dorw!= "d" and dorw!="w":
-            await ctx.send("Please enter in the format of <number> <d/w>!")
-            intdays=False
           if time<1:
             await ctx.send("Please try again, that is an invalid number of days/weeks")
-          elif time>=1 and intdays is True:
+          else:
             intdays=True
+          if dorw!= "d" and dorw!="w" and time>=1:
+            await ctx.send("Please enter in the format of <number> <d/w>!")
+            intdays=False
         except (ValueError,UnboundLocalError):
           await ctx.send("That is not a valid number of days/weeks! Please enter again!")
         
       await ctx.send("Finally, what is the message you would like to send to a new member if their account is new?")
       message = await self.bot.wait_for('message', check=lambda message: message.author.id == ctx.author.id)
-      await ctx.send(f"Ok done! Your message to them will be {message.content}")
 
 
     
@@ -61,6 +85,8 @@ class Mod(commands.Cog):
     collection=db["raidprotection"]
     collection.update_one({"_id":ctx.guild.id},{"$set":{"seconds":time}})
     collection.update_one({"_id":ctx.guild.id},{"$set":{"message":message.content}})
+    await ctx.send(f"Ok done! Your message to them will be {message.content}")
+
 
   @setup.error
   async def setup_error(self,ctx,error):
@@ -69,12 +95,6 @@ class Mod(commands.Cog):
     else:
       raise error
 
-  @commands.command()
-  @commands.is_owner()
-  async def raidsetup(self,ctx):
-    collection=db["raidprotection"]
-    for guild in self.bot.guilds:
-      collection.insert_one({"_id":guild.id,"seconds":0,"message":"None"})
 
   @commands.command(aliases=["logs","log"])
   @commands.has_permissions(manage_guild=True)
@@ -95,7 +115,7 @@ class Mod(commands.Cog):
       return
     collection=db["logs"]
     collection.update_one({"_id":ctx.guild.id},{"$set":{"mode":onoff}})
-    await ctx.send("You have toggled logs to" + onoff)
+    await ctx.send("You have toggled logs to " + onoff)
 
 
 
@@ -161,13 +181,18 @@ class Mod(commands.Cog):
 
   @commands.command()
   @commands.has_permissions(ban_members=True)
-  async def softban(self,ctx, member : discord.Member=None, *, reason=None):
+  async def softban(self,ctx, member : discord.Member=None, *, reason="no reason"):
     if not member:
-      await ctx.send("You need to enter a member to ban!")
+      await ctx.send("You need to enter a member to doftban!")
+      return
+    mrole=member.top_role
+    arole=ctx.author.top_role
+    if mrole>=arole:
+      await ctx.send("I cannot softban that person due to role hierachy")
       return
     await member.ban(reason=reason)
     await member.unban(reason=reason)
-    await ctx.send(f'Softbanned {member.mention}')
+    await ctx.send(f'Softbanned {member.mention} for {reason}')
   @softban.error
   async def softban_error(self,ctx,error):
     if isinstance(error, commands.BadArgument):
@@ -210,9 +235,14 @@ class Mod(commands.Cog):
 
   @commands.command()
   @commands.has_permissions(kick_members=True)
-  async def kick(self,ctx, member : discord.Member=None, *, reason=None):
+  async def kick(self,ctx, member : discord.Member=None, *, reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to kick!")
+      return
+    mrole=member.top_role
+    arole=ctx.author.top_role
+    if mrole>=arole:
+      await ctx.send("I cannot mute that person due to role hierachy")
       return
     await member.kick(reason=reason)
     await ctx.send(f'Kicked {member.mention} successfully! for {reason}')
@@ -228,12 +258,17 @@ class Mod(commands.Cog):
   @commands.command()
   @commands.has_permissions(ban_members=True)
   #@commands.is_owner()
-  async def ban(self,ctx, member : discord.Member=None, *, reason=None):
+  async def ban(self,ctx, member : discord.Member=None, *, reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to ban!")
       return
+    mrole=member.top_role
+    arole=ctx.author.top_role
+    if mrole>=arole:
+      await ctx.send("I cannot ban that person due to role hierachy")
+      return
     await member.ban(reason=reason)
-    await ctx.send(f'Banned {member.mention}')
+    await ctx.send(f'Banned {member.mention} for {reason}')
   @ban.error
   async def ban_error(self,ctx,error):
     if isinstance(error, commands.BadArgument):
@@ -273,6 +308,12 @@ class Mod(commands.Cog):
     if not member:
       await ctx.send("You need to enter a member to mute!")
       return
+    mrole=member.top_role
+    arole=ctx.author.top_role
+    if mrole>=arole:
+      await ctx.send("I cannot mute that person due to role hierachy")
+      return
+    
     role = discord.utils.get(ctx.guild.roles, name='mootmoot')
     if role !=None:
       await member.add_roles(role)
@@ -291,6 +332,8 @@ class Mod(commands.Cog):
       await ctx.send("You do not have permissions to mute people!")
     elif isinstance(error,commands.BotMissingPermissions):
       await ctx.send("I do not have permission to mute people!")
+    else:
+      raise error
 
 
   @commands.command()
