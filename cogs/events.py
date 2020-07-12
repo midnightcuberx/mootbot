@@ -50,7 +50,7 @@ class Events(commands.Cog):
           seconds=1814400
         if difference<seconds:
           days=round(difference/86400)
-          embed.add_field(name="⚠️ Warning!",value=f"This account was created {days} days ago")
+          embed.add_field(name="⚠️ Warning! ⚠️",value=f"This account was created {days} days ago")
         await channel.send(embed=embed)
 
   @commands.Cog.listener()
@@ -201,11 +201,11 @@ class Events(commands.Cog):
               await channel.send(embed=embed)
 
             if before.avatar_url != after.avatar_url:
-              embed = discord.Embed(title="Avatar change",
+              embed = discord.Embed(title="Avatar change by {after}",
               colour=0xffff00,
               timestamp=datetime.utcnow())
 
-              embed.set_thumbnail(url=before.avatar_url)
+              embed.set_thumbnail(url=after.avatar_url)
               embed.set_image(url=after.avatar_url)
               await channel.send(embed=embed)
 
@@ -240,18 +240,6 @@ class Events(commands.Cog):
     embed=discord.Embed(title=f"A channel was deleted in {channel.category}", 
     description=f"{channel.mention} was deleted at {channel.created_at}",color=0xffff00,timestamp=datetime.utcnow())
     await channelss.send(embed=embed)
-
-  @commands.Cog.listener()
-  async def on_guild_channel_update(self,before,after):
-    pass
-  
-  @commands.Cog.listener()
-  async def on_voice_state_update(self,member,before,after):
-    pass
-  
-  @commands.Cog.listener()
-  async def on_guild_emojis_update(self,guild,before,after):
-    pass
 
   @commands.Cog.listener()
   async def on_webhooks_update(self,channel):
@@ -302,10 +290,6 @@ class Events(commands.Cog):
     await channel.send(embed=embed)
 
   @commands.Cog.listener()
-  async def on_guild_role_update(self,before,after):
-    pass
-
-  @commands.Cog.listener()
   async def on_member_ban(self,guild,user):
     collection=db["logs"]
     a=collection.find_one({"_id":guild.id})
@@ -344,6 +328,66 @@ class Events(commands.Cog):
     pass
   #https://discordpy.readthedocs.io/en/latest/api.html#discord.on_raw_message_edit
 
+
+  @commands.Cog.listener()
+  async def on_guild_channel_update(self,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":after.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(after.guild.channels,id=channel)
+    
+    if before.name!=after.name:
+      embed=discord.Embed(title=f"{after.name} was updated",name=f"**Channel name update:**{before.name} ---> {after.name}",color=0xffff00,timestamp=datetime.utcnow())
+      await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_voice_state_update(self,member,before,after):
+    pass
+  
+  '''@commands.Cog.listener()
+  async def on_guild_emojis_update(self,guild,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(guild.channels,id=channel)
+    
+    if before.guild.emojis'''
+
+  @commands.Cog.listener()
+  async def on_guild_role_update(self,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":after.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(after.guild.channels,id=channel)
+    if before.name!=after.name:
+      embed=discord.Embed(title=f"{after.name} was updated",description=f"**Role name change:** {before.name} ---> {after.name}",color=0xffff00,timestamp=datetime.utcnow())
+    
+    elif before.role.permissions!=after.role.permissions:
+      embed=discord.Embed(title=f"{after.name} was updated",description=f"Role permissions were updated for {after.name}",color=0xffff00,timestamp=datetime.utcnow())
+    
+    await channel.send(embed=embed)
+
+    
+      
+    
 
 
 
