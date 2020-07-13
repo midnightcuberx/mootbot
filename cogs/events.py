@@ -10,7 +10,49 @@ db=client["bot"]
 class Events(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
+  
+  @commands.Cog.listener()
+  async def on_raw_reaction_add(self,payload):
+    print(payload.emoji)
+    guildid=payload.guild_id
+    collection=db["rr"]
+    rr=collection.find_one({"_id":guildid})
+    try:
+      a=rr[str(payload.message_id)]
+    except KeyError:
+      return
+    if len(a)<=0:
+      return
+    try:
+      a=rr[str(payload.message_id)][str(payload.emoji)]
+    except KeyError:
+      return
+    guild=discord.utils.get(self.bot.guilds,id=guildid)
+    role=discord.utils.get(guild.roles,id=a)
+    member=discord.utils.get(guild.members,id=payload.user_id)
+    await member.add_roles(role)
 
+  @commands.Cog.listener()
+  async def on_raw_reaction_remove(self,payload):
+    print(payload.emoji)
+    guildid=payload.guild_id
+    collection=db["rr"]
+    rr=collection.find_one({"_id":guildid})
+    try:
+      a=rr[str(payload.message_id)]
+    except KeyError:
+      return
+    if len(a)<=0:
+      return
+    try:
+      a=rr[str(payload.message_id)][str(payload.emoji)]
+    except KeyError:
+      return
+    guild=discord.utils.get(self.bot.guilds,id=guildid)
+    role=discord.utils.get(guild.roles,id=a)
+    member=discord.utils.get(guild.members,id=payload.user_id)
+    await member.remove_roles(role)
+    
   @commands.Cog.listener()
   async def on_member_join(self,member):
     current_time=time.time()
@@ -145,7 +187,19 @@ class Events(commands.Cog):
         embed=discord.Embed(title=f"A message by {message.author} was deleted in {message.channel}",description=message.content,color=0xffff00,timestamp=timenow)
         embed.set_thumbnail(url=message.author.avatar_url)
         await channel.send(embed=embed)
+    coll=db["rr"]
+    rrr=coll.find_one({"_id":message.guild.id})
+    rr=rrr["rr"]
+    try:
+      a= str(message.id)
+      rr1=[]
+      for key in rr:
+        if key!=a:
+          rr1[key]=rr[key]
 
+      coll.update_one({"_id":message.guild.id},{"$set":{"rr":rr1}})
+    except KeyError:
+      pass
   @commands.Cog.listener()
   async def on_bulk_message_delete(self,messages):
     collection=db["logs"]
@@ -244,7 +298,7 @@ class Events(commands.Cog):
   @commands.Cog.listener()
   async def on_webhooks_update(self,channel):
     collection=db["logs"]
-    a=collection.find_one({"_id":role.guild.id})
+    a=collection.find_one({"_id":channel.guild.id})
     if a["mode"]!="on":
       return
       
@@ -252,9 +306,10 @@ class Events(commands.Cog):
     if channels==0:
       return
 
-    channels=discord.utils.get(role.guild.channels,id=channels)
+    channels=discord.utils.get(channel.guild.channels,id=channels)
 
     embed=discord.Embed(title="A webhook was created",description=f"A webhook was created in {channel.mention} in {channel.category}",color=0xffff00,timestamp=datetime.utcnow())
+    await channels.send(embed=embed)
 
   @commands.Cog.listener()
   async def on_guild_role_create(self,role):
@@ -343,7 +398,7 @@ class Events(commands.Cog):
     channel=discord.utils.get(after.guild.channels,id=channel)
     
     if before.name!=after.name:
-      embed=discord.Embed(title=f"{after.name} was updated",name=f"**Channel name update:**{before.name} ---> {after.name}",color=0xffff00,timestamp=datetime.utcnow())
+      embed=discord.Embed(title=f"{after.name} was updated",name=f"**Channel name update:**{before} ---> {after}",color=0xffff00,timestamp=datetime.utcnow())
       await channel.send(embed=embed)
 
   @commands.Cog.listener()
