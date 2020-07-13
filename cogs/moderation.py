@@ -25,6 +25,44 @@ class Mod(commands.Cog):
 
   @commands.command()
   @commands.has_permissions(manage_roles=True)
+  async def removewarn(self, ctx,member:discord.Member,number:int=None):
+    if not number:
+      await ctx.send("You need to enter a warn number to remove from that user!!")
+      return
+    collection = db["warns"]
+    serverwarns = collection.find_one({"_id": ctx.guild.id})
+
+    list1 = []
+    try:
+      a = serverwarns[str(member.id)]
+    except (KeyError, TypeError):
+      await ctx.send("That member does not have any warns!")
+      return
+    try:
+      b=a[str(number)]
+    except KeyError:
+      await ctx.send("That is an invalid warn number for that user")
+      return
+    dict1={}
+    for key,value in a.items():
+      if key!=str(number):
+        dict1[key]=a[key]
+    collection.update_one({"_id": ctx.guild.id}, {"$set": {str(member.id): dict1}})
+    await ctx.send(f"Warn number {number} has been removed for {member}")
+
+  @removewarn.error
+  async def removewarn_error(self, ctx, error):
+    if isinstance(error, commands.BadArgument):
+      await ctx.send("You need to enter a valid member or a valid warn case!")
+    elif isinstance(error,commands.MissingRequiredArgument):
+      await ctx.send("YOu need to enter a member!")
+    elif isinstance(error, commands.MissingPermissions):
+      await ctx.send("You need manage roles permissions to run this command!")
+    else:
+      raise error
+
+  @commands.command()
+  @commands.has_permissions(manage_roles=True)
   @commands.bot_has_permissions(manage_roles=True)
   async def rr(self, ctx, channel: discord.TextChannel = None):
     roles=[]
@@ -270,6 +308,8 @@ class Mod(commands.Cog):
       await ctx.send("You need manage roles permissions to run this command!")
     else:
       raise error
+
+  
 
   @commands.command()
   async def warns(self, ctx, member: discord.Member = None):
