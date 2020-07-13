@@ -24,7 +24,8 @@ class Mod(commands.Cog):
     self.bot = bot
 
   @commands.command()
-  @commands.is_owner()
+  @commands.has_permissions(manage_roles=True)
+  @commands.bot_has_permissions(manage_roles=True)
   async def rr(self, ctx, channel: discord.TextChannel = None):
     roles=[]
     reactions=[]
@@ -100,8 +101,23 @@ class Mod(commands.Cog):
       await msg.add_reaction(reactions[i])
       dict1[reactions[i]]=roles[i]
     collection.update_one({"_id":ctx.guild.id},{"$set":{str(msg.id):dict1}})
-    await ctx.send("It works")
+    await ctx.send("Please make sure that mootbot's role is above the roles you want to give, otherwise the reaction roles will not work!")
 
+  @rr.error
+  async def rr_error(self,ctx,error):
+    if isinstance(error,commands.BadArgument):
+      await ctx.send("That is not a valid channel!")
+    
+    elif isinstance(error,commands.MissingRequiredArgument):
+      await ctx.send("Please enter the channel you would like to do reaction roles in")
+    
+    elif isinstance(error,commands.MissingPermissions):
+      await ctx.send("You cannot use this command because you do not have the manage roles permission")
+    
+    elif isinstance(error,commands.BotMissingPermissions):
+      await ctx.send("I cannot do this because I do not have manage roles permissions or the roles you want me to allocate is above my role")
+    else:
+      raise error
     #async def rr(self,ctx,messageid:int):
     '''
     try:
@@ -139,8 +155,7 @@ class Mod(commands.Cog):
   async def avatar(self, ctx, member: discord.Member = None):
     if not member:
       member = ctx.message.author
-    embed = discord.Embed(
-        title=f"{member}'s avatar", description="", color=0xeee657)
+    embed = discord.Embed(title=f"{member}'s avatar", description="", color=0xeee657)
     embed.set_image(url=member.avatar_url)
     await ctx.send(embed=embed)
 
@@ -153,21 +168,15 @@ class Mod(commands.Cog):
       time = 0
       dorw = "d"
     if onoff != "off" and onoff != "on":
-      await ctx.send(
-          "That is not a valid option! You can only switch raid protection on and off!"
-      )
+      await ctx.send("That is not a valid option! You can only switch raid protection on and off!")
       return
     elif onoff == "on":
       await ctx.send("Succefully switched raid protection on")
-      await ctx.send(
-          "What is the minimum age an account needs to be to pass the raid protection procedure? Answer with a whole number of days or weeks in this format: `<number> <d/w>`"
-      )
+      await ctx.send("What is the minimum age an account needs to be to pass the raid protection procedure? Answer with a whole number of days or weeks in this format: `<number> <d/w>`")
       intdays = False
       corform = False
       while intdays is False or corform is False:
-        message = await self.bot.wait_for(
-            'message',
-            check=lambda message: message.author.id == ctx.author.id)
+        message = await self.bot.wait_for('message',check=lambda message: message.author.id == ctx.author.id)
         try:
           time, dorw = message.content.lower().split(" ")
           corform = True
@@ -177,50 +186,31 @@ class Mod(commands.Cog):
         try:
           time = int(time)
           if time < 1:
-            await ctx.send(
-                "Please try again, that is an invalid number of days/weeks"
-            )
+            await ctx.send("Please try again, that is an invalid number of days/weeks")
           else:
             intdays = True
           if dorw != "d" and dorw != "w" and time >= 1:
-            await ctx.send(
-                "Please enter in the format of <number> <d/w>!")
+            await ctx.send("Please enter in the format of <number> <d/w>!")
             intdays = False
         except (ValueError, UnboundLocalError):
-          await ctx.send(
-              "That is not a valid number of days/weeks! Please enter again!"
-          )
+          await ctx.send("That is not a valid number of days/weeks! Please enter again!")
 
-      await ctx.send(
-          "Finally, what is the message you would like to send to a new member if their account is new?"
-      )
-      message = await self.bot.wait_for(
-          'message',
-          check=lambda message: message.author.id == ctx.author.id)
+      await ctx.send("Finally, what is the message you would like to send to a new member if their account is new?")
+      message = await self.bot.wait_for('message',check=lambda message: message.author.id == ctx.author.id)
 
     time = time * 86400
     if dorw == "w":
       time = time * 7
 
     collection = db["raidprotection"]
-    collection.update_one({
-        "_id": ctx.guild.id
-    }, {"$set": {
-        "seconds": time
-    }})
-    collection.update_one({
-        "_id": ctx.guild.id
-    }, {"$set": {
-        "message": message.content
-    }})
-    await ctx.send(
-        f"Ok done! Your message to them will be {message.content}")
+    collection.update_one({"_id": ctx.guild.id}, {"$set": {"seconds": time}})
+    collection.update_one({"_id": ctx.guild.id}, {"$set": {"message": message.content}})
+    await ctx.send(f"Ok done! Your message to them will be {message.content}")
 
   @setup.error
   async def setup_error(self, ctx, error):
     if isinstance(error, commands.MissingPermissions):
-      await ctx.send(
-          "You need manage server permissions to run this command!")
+      await ctx.send("You need manage server permissions to run this command!")
     else:
       raise error
 
@@ -231,11 +221,7 @@ class Mod(commands.Cog):
       await ctx.send("You must enter a channel!")
       return
     collection = db["logs"]
-    collection.update_one({
-        "_id": ctx.guild.id
-    }, {"$set": {
-        "channel": channel.id
-    }})
+    collection.update_one({"_id": ctx.guild.id}, {"$set": {"channel": channel.id}})
     await ctx.send(f"You have set your logging channel to {channel}")
 
   @commands.command()
@@ -251,11 +237,7 @@ class Mod(commands.Cog):
 
   @commands.command()
   @commands.has_permissions(manage_roles=True)
-  async def warn(self,
-                  ctx,
-                  member: discord.Member = None,
-                  *,
-                  reason="no reason"):
+  async def warn(self,ctx,member:discord.Member = None,*,reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to warn!")
       return
@@ -277,11 +259,7 @@ class Mod(commands.Cog):
     numofwarns += 1
     serverwarns[str(member.id)][str(numofwarns)] = reason
     userwarns = serverwarns[str(member.id)]
-    collection.update_one({
-        "_id": ctx.guild.id
-    }, {"$set": {
-        str(member.id): userwarns
-    }})
+    collection.update_one({"_id": ctx.guild.id}, {"$set": {str(member.id): userwarns}})
     await ctx.send(f"{member} has been warned for {reason}")
 
   @warn.error
@@ -289,8 +267,9 @@ class Mod(commands.Cog):
     if isinstance(error, commands.BadArgument):
       await ctx.send("You need to enter a valid member!")
     elif isinstance(error, commands.MissingPermissions):
-      await ctx.send(
-          "You need manage roles permissions to run this command!")
+      await ctx.send("You need manage roles permissions to run this command!")
+    else:
+      raise error
 
   @commands.command()
   async def warns(self, ctx, member: discord.Member = None):
@@ -320,11 +299,7 @@ class Mod(commands.Cog):
 
   @commands.command()
   @commands.has_permissions(ban_members=True)
-  async def softban(self,
-                    ctx,
-                    member: discord.Member = None,
-                    *,
-                    reason="no reason"):
+  async def softban(self,ctx,member: discord.Member = None,*,reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to doftban!")
       return
@@ -379,11 +354,7 @@ class Mod(commands.Cog):
 
   @commands.command()
   @commands.has_permissions(kick_members=True)
-  async def kick(self,
-                  ctx,
-                  member: discord.Member = None,
-                  *,
-                  reason="no reason"):
+  async def kick(self,ctx,member: discord.Member = None,*,reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to kick!")
       return
@@ -407,11 +378,7 @@ class Mod(commands.Cog):
   @commands.command()
   @commands.has_permissions(ban_members=True)
   #@commands.is_owner()
-  async def ban(self,
-                ctx,
-                member: discord.Member = None,
-                *,
-                reason="no reason"):
+  async def ban(self,ctx,member: discord.Member = None,*,reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to ban!")
       return
@@ -438,21 +405,15 @@ class Mod(commands.Cog):
   @commands.has_permissions(manage_messages=True)
   async def purge(self, ctx, limit: int = 1):
     if not limit:
-      await ctx.send(
-          "Ree! you must enter the amount of messages to purge")
+      await ctx.send("Ree! you must enter the amount of messages to purge")
 
     elif limit > 20:
-      await ctx.send(
-          "I can only purge max 20 messages at once you nonce. But since Im feeling nice, I'll purge 20 messagss for you"
-      )
+      await ctx.send("I can only purge max 20 messages at once you nonce. But since Im feeling nice, I'll purge 20 messagss for you")
       limit = 20
       await asyncio.sleep(2)
     await ctx.message.delete()
     await ctx.channel.purge(limit=limit)
-    await ctx.send(
-        '{} has successfully purged {} messages'.format(
-            ctx.author.mention, limit),
-        delete_after=1.0)
+    await ctx.send('{} has successfully purged {} messages'.format(ctx.author.mention, limit),delete_after=1.0)
 
   @purge.error
   async def purge_error(self, ctx, error):
@@ -519,8 +480,7 @@ class Mod(commands.Cog):
     elif isinstance(error, commands.BotMissingPermissions):
       await ctx.send("I do not have permission to unmute people!")
     else:
-      await ctx.send(
-          "You need to have a mootmoot role in order to unmute someone")
+      await ctx.send("You need to have a mootmoot role in order to unmute someone")
 
 
 def setup(bot):
