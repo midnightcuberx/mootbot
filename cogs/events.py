@@ -7,6 +7,7 @@ mongosecret=os.environ.get("mongosecret")
 client = pymongo.MongoClient(mongosecret)
 db=client["bot"]
 
+#use datetime and use arg splitter to get days etc one on phone
 class Events(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
@@ -188,13 +189,12 @@ class Events(commands.Cog):
         embed.set_thumbnail(url=message.author.avatar_url)
         await channel.send(embed=embed)
     coll=db["rr"]
-    rrr=coll.find_one({"_id":message.guild.id})
-    rr=rrr["rr"]
+    rr=coll.find_one({"_id":message.guild.id})
     try:
       a= str(message.id)
-      rr1=[]
+      rr1={}
       for key in rr:
-        if key!=a:
+        if key!=a and key!="_id":
           rr1[key]=rr[key]
 
       coll.update_one({"_id":message.guild.id},{"$set":{"rr":rr1}})
@@ -255,7 +255,7 @@ class Events(commands.Cog):
               await channel.send(embed=embed)
 
             if before.avatar_url != after.avatar_url:
-              embed = discord.Embed(title="Avatar change by {after}",
+              embed = discord.Embed(title=f"Avatar change by {after}",
               colour=0xffff00,
               timestamp=datetime.utcnow())
 
