@@ -25,7 +25,7 @@ class Mod(commands.Cog):
 
 
   @commands.command()
-  @commands.has_permissions(manage_roles=True)
+  @commands.has_guild_permissions(manage_roles=True)
   async def removewarn(self, ctx,member:discord.Member,number:int=None):
     if not number:
       await ctx.send("You need to enter a warn number to remove from that user!!")
@@ -63,7 +63,7 @@ class Mod(commands.Cog):
       raise error
 
   @commands.command()
-  @commands.has_permissions(manage_roles=True)
+  @commands.has_guild_permissions(manage_roles=True)
   async def warn(self,ctx,member:discord.Member = None,*,reason="no reason"):
     if not member:
       await ctx.send("You need to enter a member to warn!")
@@ -75,10 +75,12 @@ class Mod(commands.Cog):
     try:
       a = serverwarns[str(member.id)]
       memberwarns = serverwarns[str(member.id)]
-      for key, value in sorted(
-          memberwarns.items(), reverse=False, key=lambda item: item[0]):
-        list1.append(key)
-      numofwarns = int(list1[-1])
+      if len(memberwarns)<1:
+        numofwarns=0
+      else:
+        for key, value in sorted(memberwarns.items(), reverse=False, key=lambda item: item[0]):
+          list1.append(key)
+        numofwarns = int(list1[-1])
     except (KeyError, TypeError):
       serverwarns[str(member.id)] = {}
       numofwarns = 0
@@ -111,10 +113,11 @@ class Mod(commands.Cog):
     except KeyError:
       await ctx.send("This user has no warnings in this server")
       return
+    if len(a)<=0:
+      await ctx.send("This user has no warnings in this server")
     userwarns = serverwarns[str(member.id)]
     embed = discord.Embed(title=f"Warns for {member} in {ctx.guild}")
-    for key, value1 in sorted(
-        userwarns.items(), reverse=False, key=lambda item: item[0]):
+    for key, value1 in sorted(userwarns.items(), reverse=False, key=lambda item: item[0]):
       embed.add_field(name=f"#{key}", value=f"{value1}")
     await ctx.send(embed=embed)
 
@@ -231,7 +234,7 @@ class Mod(commands.Cog):
       raise error
 
   @commands.command()
-  @commands.has_permissions(manage_messages=True)
+  @commands.has_guild_permissions(manage_messages=True)
   async def purge(self, ctx, limit: int = 1):
     if not limit:
       await ctx.send("Ree! you must enter the amount of messages to purge")
