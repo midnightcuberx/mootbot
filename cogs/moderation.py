@@ -1,319 +1,454 @@
-import discord, pymongo, dns, asyncio, os
+import discord,dns,pymongo,os,random,time,asyncio
+import datetime as date
 from discord.ext import commands
-from discord import NotFound
 from datetime import datetime
 
-mongosecret = os.environ.get("mongosecret")
+mongosecret=os.environ.get("mongosecret")
 client = pymongo.MongoClient(mongosecret)
-db = client["bot"]
+db=client["bot"]
+    
 
-
-#def get_emoji(string: discord.Emoji):
-  #extra,extra1,extra2=string
-
-
-def get_role(role):
-  extra, role = role.split("@")
-  role, extra = role.split(">")
-  extra, role_id = role.split("&")
-  return int(role_id)
-  
-
-class Mod(commands.Cog):
+#use datetime and use arg splitter to get days etc one on phone
+class Events(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
-
-
-  @commands.command()
-  @commands.has_guild_permissions(manage_roles=True)
-  async def removewarn(self, ctx,member:discord.Member,number:int=None):
-    if not number:
-      await ctx.send("You need to enter a warn number to remove from that user!!")
-      return
-    collection = db["warns"]
-    serverwarns = collection.find_one({"_id": ctx.guild.id})
-
-    list1 = []
-    try:
-      a = serverwarns[str(member.id)]
-    except (KeyError, TypeError):
-      await ctx.send("That member does not have any warns!")
-      return
-    try:
-      b=a[str(number)]
-    except KeyError:
-      await ctx.send("That is an invalid warn number for that user")
-      return
-    dict1={}
-    for key,value in a.items():
-      if key!=str(number):
-        dict1[key]=a[key]
-    collection.update_one({"_id": ctx.guild.id}, {"$set": {str(member.id): dict1}})
-    await ctx.send(f"Warn number {number} has been removed for {member}")
-
-  @removewarn.error
-  async def removewarn_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("You need to enter a valid member or a valid warn case!")
-    elif isinstance(error,commands.MissingRequiredArgument):
-      await ctx.send("YOu need to enter a member!")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You need manage roles permissions to run this command!")
-    else:
-      raise error
-
-  @commands.command()
-  @commands.has_guild_permissions(manage_roles=True)
-  async def warn(self,ctx,member:discord.Member = None,*,reason="no reason"):
-    if not member:
-      await ctx.send("You need to enter a member to warn!")
-      return
-    collection = db["warns"]
-    serverwarns = collection.find_one({"_id": ctx.guild.id})
-
-    list1 = []
-    try:
-      a = serverwarns[str(member.id)]
-      memberwarns = serverwarns[str(member.id)]
-      if len(memberwarns)<1:
-        numofwarns=0
-      else:
-        for key, value in sorted(memberwarns.items(), reverse=False, key=lambda item: item[0]):
-          list1.append(key)
-        numofwarns = int(list1[-1])
-    except (KeyError, TypeError):
-      serverwarns[str(member.id)] = {}
-      numofwarns = 0
-
-    numofwarns += 1
-    serverwarns[str(member.id)][str(numofwarns)] = reason
-    userwarns = serverwarns[str(member.id)]
-    collection.update_one({"_id": ctx.guild.id}, {"$set": {str(member.id): userwarns}})
-    await ctx.send(f"{member} has been warned for {reason}")
-
-  @warn.error
-  async def warn_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("You need to enter a valid member!")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You need manage roles permissions to run this command!")
-    else:
-      raise error
-
   
-
-  @commands.command()
-  async def warns(self, ctx, member: discord.Member = None):
-    if not member:
-      member = ctx.author
-    collection = db["warns"]
-    serverwarns = collection.find_one({"_id": ctx.guild.id})
+  @commands.Cog.listener()
+  async def on_raw_reaction_add(self,payload):
+    print(payload.emoji)
+    guildid=payload.guild_id
+    collection=db["rr"]
+    rr=collection.find_one({"_id":guildid})
     try:
-      a = serverwarns[str(member.id)]
+      a=rr[str(payload.message_id)]
     except KeyError:
-      await ctx.send("This user has no warnings in this server")
       return
     if len(a)<=0:
-      await ctx.send("This user has no warnings in this server")
-    userwarns = serverwarns[str(member.id)]
-    embed = discord.Embed(title=f"Warns for {member} in {ctx.guild}")
-    for key, value1 in sorted(userwarns.items(), reverse=False, key=lambda item: item[0]):
-      embed.add_field(name=f"#{key}", value=f"{value1}")
-    await ctx.send(embed=embed)
-
-  @commands.command()
-  @commands.is_owner()
-  async def warnsetup(self, ctx):
-    collection = db["warns"]
-    for guild in self.bot.guilds:
-      collection.insert_one({"_id": guild.id})
-    await ctx.send("done")
-
-  @commands.command()
-  @commands.has_permissions(ban_members=True)
-  async def softban(self,ctx,member: discord.Member = None,*,reason="no reason"):
-    if not member:
-      await ctx.send("You need to enter a member to doftban!")
       return
-    mrole = member.top_role
-    arole = ctx.author.top_role
-    if mrole >= arole:
-      await ctx.send("I cannot softban that person due to role hierachy")
+    try:
+      a=rr[str(payload.message_id)][str(payload.emoji)]
+    except KeyError:
       return
-    await member.ban(reason=reason)
-    await member.unban(reason=reason)
-    await ctx.send(f'Softbanned {member.mention} for {reason}')
+    guild=discord.utils.get(self.bot.guilds,id=guildid)
+    role=discord.utils.get(guild.roles,id=a)
+    member=discord.utils.get(guild.members,id=payload.user_id)
+    await member.add_roles(role)
 
-  @softban.error
-  async def softban_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("I could not recognise that user")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You do not have necessary permissions to do so!")
-    elif isinstance(error, commands.BotMissingPermissions):
-      await ctx.send("I do not have permission to ban that user!")
-
-  '''    
-  @commands.command()
-  @commands.has_permissions(manage_messages=True)
-  async def invitetoggle(self,ctx,onoff=None):
-    collection=db["invites"]
-
-    invite=collection.find_one({"_id":ctx.guild.id})
-    invites=invite["mode"]
-    if not onoff:
-      if invites=="on":
-        invites="off"
-      else:
-        invites="on"
-      await ctx.send(f"Successfully toggled invite police to {invites}")
-      invite[str(ctx.guild.id)]=invites
-      with open('invitetoggle.json','w') as a:
-        json.dump(invite,a,indent=4)
+  @commands.Cog.listener()
+  async def on_raw_reaction_remove(self,payload):
+    print(payload.emoji)
+    guildid=payload.guild_id
+    collection=db["rr"]
+    rr=collection.find_one({"_id":guildid})
+    try:
+      a=rr[str(payload.message_id)]
+    except KeyError:
       return
-    elif onoff.lower() != "on" and onoff.lower() != "off":
-      await ctx.send("You must tell me to toggle it on or off!")
+    if len(a)<=0:
       return
-    onoff=onoff.lower()
-    invites=onoff
-    await ctx.send(f"Successfully toggled invite police to {invites}")
-    collection.update_one({"_id":ctx.guild.id},{"$set":{"mode":invites}})
-  @invitetoggle.error
-  async def invitetoggle_error(self,ctx,error):
-    if isinstance(error,commands.MissingPermissions):
-      await ctx.send("You can only use this command if you have the manage messages permission!")
+    try:
+      a=rr[str(payload.message_id)][str(payload.emoji)]
+    except KeyError:
+      return
+    guild=discord.utils.get(self.bot.guilds,id=guildid)
+    role=discord.utils.get(guild.roles,id=a)
+    member=discord.utils.get(guild.members,id=payload.user_id)
+    await member.remove_roles(role)
+    
+  @commands.Cog.listener()
+  async def on_member_join(self,member):
+    current_time=time.time()
+    member_created=member.created_at.timestamp()
+    if member.guild.id==431906396032991232:
+      if current_time - member_created < 1814400:
+        role = discord.utils.get(member.guild.roles, id=587216429233733632)
+        await asyncio.sleep(1.5)
+        await member.add_roles(role)
+        channel=discord.utils.get(member.guild.channels,id=552609849939329027)
+        await channel.send(f"Account {member.name} was created less than 3 weeks ago and was muted successfully")
+        await member.send("Due to your account being created recently, you have been automuted. \
+                    \n To gain access to the server, DM <@575252669443211264> for access and the staff team will respond as soon as possible. ")
+    else:
+      collection=db["raidprotection"]
+      guildsettings=collection.find_one({"_id":member.guild.id})
+      seconds=guildsettings["seconds"]
+      if current_time - member_created < seconds:
+        role = discord.utils.get(member.guild.roles, name="mootmoot")
+        await member.add_roles(role)
+        message=guildsettings["message"]
+        await member.send(message)
+    collection=db["logs"]
+    a=collection.find_one({"_id":member.guild.id})
+    if a["mode"]=="on":
+      channel=a["channel"]
+      if channel!=0:
+        channel=discord.utils.get(member.guild.channels,id=channel)
+        timenow=datetime.utcnow()
+        embed=discord.Embed(title=f"{member} has joined the server",description=f"{member} has joined the server",color=0xffff00,timestamp=timenow)
+        embed.set_thumbnail(url=member.avatar_url)
+        difference=current_time-member_created
+        collection=db["raidprotection"]
+        guildsettings=collection.find_one({"_id":member.guild.id})
+        seconds=guildsettings["seconds"]
+        if member.guild.id==431906396032991232:
+          seconds=1814400
+        times=difference/86400
+        if difference<seconds:
+          embed.add_field(name="⚠️ Warning! ⚠️",value=f"This account was created {times} ago")
+        else:
+          embed.add_field(name="This account isn't a new account",value=f"This account was created {times} ago")
+          
+        await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_member_remove(self,member):
+    collection=db["logs"]
+    a=collection.find_one({"_id":member.guild.id})
+    if a["mode"]=="on":
+      channel=a["channel"]
+      if channel!=0:
+        channel=discord.utils.get(member.guild.channels,id=channel)
+        timenow=datetime.utcnow()
+        embed=discord.Embed(title=f"{member} has left the server",description=f"{member} has left the server",color=0xffff00,timestamp=timenow)
+        embed.set_thumbnail(url=member.avatar_url)
+        await channel.send(embed=embed)    
   '''
+  @commands.Cog.listener()
+  async def on_raw_message_delete(self,payload):
+    guild=self.bot.get_guild(payload.guild_id)
+    channel=discord.utils.get(guild.channels,id=payload.channel_id)
+    await channel.send(payload.message_id)
+    await channel.send("est")'''
 
-  @commands.command()
-  @commands.has_permissions(kick_members=True)
-  async def kick(self,ctx,member: discord.Member = None,*,reason="no reason"):
-    if not member:
-      await ctx.send("You need to enter a member to kick!")
+  @commands.Cog.listener()
+  async def on_member_update(self,before, after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":after.guild.id})
+    if a["mode"]!="on":
       return
-    mrole = member.top_role
-    arole = ctx.author.top_role
-    if mrole >= arole:
-      await ctx.send("I cannot mute that person due to role hierachy")
+    channel=a["channel"]
+    if channel==0:
       return
-    await member.kick(reason=reason)
-    await ctx.send(f'Kicked {member.mention} successfully! for {reason}')
+    
+    channel=discord.utils.get(after.guild.channels,id=channel)
+    timenow=datetime.utcnow()
+ 
+    n = after.display_name 
+    if n!=before.display_name:
+      embed=discord.Embed(title=f"{after} nickname changed",description=f"{before.display_name} --> {after.display_name}",color=0xffff00,timestamp=timenow)
+      embed.set_thumbnail(url=after.avatar_url)
+      await channel.send(embed=embed)
 
-  @kick.error
-  async def kick_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("I could not recognise that user")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You do not have necessary permissions to do so!")
-    elif isinstance(error, commands.BotMissingPermissions):
-      await ctx.send("I do not have permission to kick that user!")
+    if before.roles!=after.roles:
+      embed = discord.Embed(title=f"Role updates for {after}",
+      color=0xffff00,
+      timestamp=datetime.utcnow())
+      embed.set_thumbnail(url=after.avatar_url)
+      after_roles=[r.mention for r in after.roles if r not in before.roles]
+      before_roles=[r.mention for r in before.roles if r not in after.roles]
 
-  @commands.command()
-  @commands.has_permissions(ban_members=True)
-  #@commands.is_owner()
-  async def ban(self,ctx,member: discord.Member = None,*,reason="no reason"):
-    if not member:
-      await ctx.send("You need to enter a member to ban!")
+      if len(after_roles)>0:
+        embed.add_field(name=f"+{len(after_roles)} roles",value=", ".join(after_roles),inline=False)
+      if len(before_roles)>0:
+        embed.add_field(name=f"-{len(before_roles)} roles",value=", ".join(before_roles),inline=False)
+      await channel.send(embed=embed)
+    
+
+  @commands.Cog.listener()
+  async def on_message_edit(self,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id": before.guild.id})
+    if a["mode"]!="on":
       return
-    mrole = member.top_role
-    arole = ctx.author.top_role
-    if mrole >= arole:
-      await ctx.send("I cannot ban that person due to role hierachy")
+      
+    channel=a["channel"]
+    if channel==0:
       return
-    await member.ban(reason=reason)
-    await ctx.send(f'Banned {member.mention} for {reason}')
+    channel=discord.utils.get(after.guild.channels,id=channel)
+    
+    if before.content != after.content:
+      embed = discord.Embed(title=f"Message edited in {after.channel}", description=f"Edit by {after.author}.",#.display_name
+      colour=0xffff00,
+      timestamp=datetime.utcnow())
+      embed.set_thumbnail(url=after.author.avatar_url)
+      fields = [("Before", before.content, False),
+      ("After", after.content, False)]
 
-  @ban.error
-  async def ban_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("I could not recognise that user")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You do not have necessary permissions to do so!")
-    elif isinstance(error, commands.BotMissingPermissions):
-      await ctx.send("I do not have permission to ban that user!")
-    else:
-      raise error
+      for name, value, inline in fields:
+        embed.add_field(name=name, value=value, inline=inline)
 
-  @commands.command()
-  @commands.has_guild_permissions(manage_messages=True)
-  async def purge(self, ctx, limit: int = 1):
-    if not limit:
-      await ctx.send("Ree! you must enter the amount of messages to purge")
+      await channel.send(embed=embed)
 
-    elif limit > 20:
-      await ctx.send("I can only purge max 20 messages at once you nonce. But since Im feeling nice, I'll purge 20 messagss for you")
-      limit = 20
-      await asyncio.sleep(2)
-    await ctx.message.delete()
-    await ctx.channel.purge(limit=limit)
-    await ctx.send('{} has successfully purged {} messages'.format(ctx.author.mention, limit),delete_after=1.0)
+  
+  @commands.Cog.listener()
+  async def on_message_delete(self,message):
+    collection=db["logs"]
+    a=collection.find_one({"_id":message.guild.id})
+    if a["mode"]=="on":
+      channel=a["channel"]
+      if channel!=0:
+        channel=discord.utils.get(message.guild.channels,id=channel)
+        timenow=datetime.utcnow() 
+        embed=discord.Embed(title=f"A message by {message.author} was deleted in {message.channel}",description=message.content,color=0xffff00,timestamp=timenow)
+        embed.set_thumbnail(url=message.author.avatar_url)
+        await channel.send(embed=embed)
+    coll=db["rr"]
+    rr=coll.find_one({"_id":message.guild.id})
+    try:
+      a= str(message.id)
+      rr1={}
+      for key in rr:
+        if key!=a and key!="_id":
+          rr1[key]=rr[key]
 
-  @purge.error
-  async def purge_error(self, ctx, error):
-    if isinstance(error, commands.MissingPermissions):
-      await ctx.send("You do not have necessary permissions to do so!")
-    elif isinstance(error, commands.BotMissingPermissions):
-      await ctx.send("I do not have permission to delete messages!")
+      coll.update_one({"_id":message.guild.id},{"$set":{"rr":rr1}})
+    except KeyError:
+      pass
+  @commands.Cog.listener()
+  async def on_bulk_message_delete(self,messages):
+    collection=db["logs"]
+    a=collection.find_one({"_id":messages.guild_id})
+    if a["mode"]=="on":
+      channel=a["channel"]
+      if channel!=0:
+        channel=discord.utils.get(messages.guild.channels,id=channel)
+        timenow=datetime.utcnow() 
+        embed=discord.Embed(title=f"Messages bulk deleted in {messages.channel}",description=len(messages),color=0xffff00,timestamp=timenow)
 
-  @commands.command(aliases=["shut"])
-  @commands.has_permissions(kick_members=True)
-  async def mute(self,ctx,member: discord.Member = None,*,reason="no reason"):
-    guild = ctx.guild
-    if not member:
-      await ctx.send("You need to enter a member to mute!")
+        await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_user_update(self, before, after):
+    collection=db["logs"]
+    for guild in self.bot.guilds:
+      a=collection.find_one({"_id":guild.id})
+      if a["mode"]=="on":
+        user=discord.utils.get(guild.members, id=after.id)
+        if not user:
+          pass
+        else:
+          channel=a["channel"]
+          if channel!=0:
+            channel=discord.utils.get(guild.channels,id=channel)
+
+            if before.name != after.name:
+              embed = discord.Embed(title=f"Username change by {after}",
+              colour=0xffff00,
+              timestamp=datetime.utcnow())
+              embed.set_thumbnail(url=after.avatar_url)
+              fields = [("Before", before, False),#.name
+              ("After", after, False)]
+
+              for name, value, inline in fields:
+                embed.add_field(name=name, value=value, inline=inline)
+              embed.set_thumbnail(url=after.avatar_url)
+              await channel.send(embed=embed)
+
+            if before.discriminator != after.discriminator:
+              embed = discord.Embed(title=f"{after} changed their discriminator",
+              colour=0xffff00,
+              timestamp=datetime.utcnow())
+              embed.set_thumbnail(url=after.avatar_url)
+
+              fields = [("Before", before.discriminator, False),
+                    ("After", after.discriminator, False)]
+
+              for name, value, inline in fields:
+                embed.add_field(name=name, value=value, inline=inline)
+
+              await channel.send(embed=embed)
+
+            if before.avatar_url != after.avatar_url:
+              embed = discord.Embed(title=f"Avatar change by {after}",
+              colour=0xffff00,
+              timestamp=datetime.utcnow())
+
+              embed.set_thumbnail(url=after.avatar_url)
+              embed.set_image(url=after.avatar_url)
+              await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_guild_channel_create(self,channel):
+    role=discord.utils.get(channel.guild.roles,name="mootmoot")
+    await channel.set_permissions(role,send_messages=False)
+    collection=db["logs"]
+    a=collection.find_one({"_id":channel.guild.id})
+    if a["mode"]!="on":
       return
-    mrole = member.top_role
-    arole = ctx.author.top_role
-    if mrole >= arole:
-      await ctx.send("I cannot mute that person due to role hierachy")
+      
+    channels=a["channel"]
+    if channels==0:
+      return
+    channelss=discord.utils.get(channel.guild.channels,id=channels)
+    embed=discord.Embed(title=f"A channel was created in {channel.category}",description=f"{channel.mention} was created at {channel.created_at}",color=0xffff00,timestamp=datetime.utcnow())
+    embed.add_field(name="Channel overwrites:",value=channel.overwrites,inline=False)
+    await channelss.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_guild_channel_delete(self,channel):
+    collection=db["logs"]
+    a=collection.find_one({"_id":channel.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channels=a["channel"]
+    if channels==0:
+      return
+    channelss=discord.utils.get(channel.guild.channels,id=channels)
+    embed=discord.Embed(title=f"A channel was deleted in {channel.category}", 
+    description=f"{channel.mention} was deleted at {channel.created_at}",color=0xffff00,timestamp=datetime.utcnow())
+    await channelss.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_webhooks_update(self,channel):
+    collection=db["logs"]
+    a=collection.find_one({"_id":channel.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channels=a["channel"]
+    if channels==0:
       return
 
-    role = discord.utils.get(ctx.guild.roles, name='mootmoot')
-    if role != None:
-      await member.add_roles(role)
-      await ctx.send(
-          f"{member.mention} has successfully been muted for {reason}")
-    elif not role:
-      venimute = await guild.create_role(name="mootmoot")
-      for channel in ctx.guild.text_channels:
-        await channel.set_permissions(venimute, send_messages=False)
-      await member.add_roles(venimute)
-      await ctx.send(
-          f"{member.mention} has successfully been muted for {reason}")
+    channels=discord.utils.get(channel.guild.channels,id=channels)
 
-  @mute.error
-  async def mute_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("Please enter a valid user to mute!")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You do not have permissions to mute people!")
-    elif isinstance(error, commands.BotMissingPermissions):
-      await ctx.send("I do not have permission to mute people!")
-    else:
-      raise error
+    embed=discord.Embed(title="A webhook was created",description=f"A webhook was created in {channel.mention} in {channel.category}",color=0xffff00,timestamp=datetime.utcnow())
+    await channels.send(embed=embed)
 
-  @commands.command()
-  @commands.has_permissions(kick_members=True)
-  async def unmute(self, ctx, member: discord.Member = None):
-    if not member:
-      await ctx.send("You need to enter a member to unmute!")
+  @commands.Cog.listener()
+  async def on_guild_role_create(self,role):
+    collection=db["logs"]
+    a=collection.find_one({"_id":role.guild.id})
+    if a["mode"]!="on":
       return
-    guild = ctx.guild
-    for role in guild.roles:
-      if role.name == "mootmoot":
-        await member.remove_roles(role)
-        await ctx.send(f"{member.mention} has been unmuted")
+      
+    channel=a["channel"]
+    if channel==0:
+      return
 
-  @unmute.error
-  async def unmute_error(self, ctx, error):
-    if isinstance(error, commands.BadArgument):
-      await ctx.send("Please enter a valid user to unmute!")
-    elif isinstance(error, commands.MissingPermissions):
-      await ctx.send("You do not have permissions to unmute people!")
-    elif isinstance(error, commands.BotMissingPermissions):
-      await ctx.send("I do not have permission to unmute people!")
-    else:
-      await ctx.send("You need to have a mootmoot role in order to unmute someone")
+    channel=discord.utils.get(role.guild.channels,id=channel)
+
+    embed=discord.Embed(title="A role was created",description=f"{role.mention} was created at {role.created_at}\nPermissions: {role.permissions}",timestamp=datetime.utcnow())
+    await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_guild_role_delete(self,role):
+    collection=db["logs"]
+    a=collection.find_one({"_id":role.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(role.guild.channels,id=channel)
+
+
+    embed=discord.Embed(title="A role was deleted",description=f"{role.mention} was deleted\nPermissions: {role.permissions}",timestamp=datetime.utcnow())
+    await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_member_ban(self,guild,user):
+    collection=db["logs"]
+    a=collection.find_one({"_id":guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(guild.channels,id=channel)
+
+    embed=discord.Embed(title=f"{user} was banned!",description=f"{user} must have been a bad boy/girl!",timestamp=datetime.utcnow())
+
+    await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_member_unban(self,guild,user):
+    collection=db["logs"]
+    a=collection.find_one({"_id":guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(guild.channels,id=channel)
+
+    embed=discord.Embed(title=f"{user} was unbanned!",description="I wonder why they were banned in the first place",timestamp=datetime.utcnow())
+
+    await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_invite_create(self,invite):
+    pass
+  #https://discordpy.readthedocs.io/en/latest/api.html#discord.on_raw_message_edit
+
+
+  @commands.Cog.listener()
+  async def on_guild_channel_update(self,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":after.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(after.guild.channels,id=channel)
+    
+    if before.name!=after.name:
+      embed=discord.Embed(title=f"{after.name} was updated",name=f"**Channel name update:**{before} ---> {after}",color=0xffff00,timestamp=datetime.utcnow())
+      await channel.send(embed=embed)
+
+  @commands.Cog.listener()
+  async def on_voice_state_update(self,member,before,after):
+    pass
+  
+  '''@commands.Cog.listener()
+  async def on_guild_emojis_update(self,guild,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(guild.channels,id=channel)
+    
+    if before.guild.emojis'''
+
+  @commands.Cog.listener()
+  async def on_guild_role_update(self,before,after):
+    collection=db["logs"]
+    a=collection.find_one({"_id":after.guild.id})
+    if a["mode"]!="on":
+      return
+      
+    channel=a["channel"]
+    if channel==0:
+      return
+
+    channel=discord.utils.get(after.guild.channels,id=channel)
+    if before.name!=after.name:
+      embed=discord.Embed(title=f"{after.name} was updated",description=f"**Role name change:** {before.name} ---> {after.name}",color=0xffff00,timestamp=datetime.utcnow())
+    
+    elif before.role.permissions!=after.role.permissions:
+      embed=discord.Embed(title=f"{after.name} was updated",description=f"Role permissions were updated for {after.name}",color=0xffff00,timestamp=datetime.utcnow())
+    
+    await channel.send(embed=embed)
+
+    
+      
+    
+
 
 
 def setup(bot):
-  bot.add_cog(Mod(bot))
+  bot.add_cog(Events(bot))
