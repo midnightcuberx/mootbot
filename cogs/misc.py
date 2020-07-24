@@ -18,9 +18,17 @@ def get_role(role):
 class Misc(commands.Cog):
   def __init__(self, bot):
     self.bot = bot
+  @commands.command()
+  async def test(self,ctx):
+    if isinstance (ctx.channel,discord.DMChannel):
+      await ctx.send("ok")
+  
+  '''@commands.command()
+  async def suggest(self,ctx,*,message):
+    member=discord.utils.get(self.bot.users,id="")'''
 
   @commands.command()
-  @commands.has_permissions(manage_roles=True)
+  @commands.has_guild_permissions(manage_roles=True)
   @commands.bot_has_permissions(manage_roles=True)
   async def rr(self, ctx, channel: discord.TextChannel = None):
     roles=[]
@@ -91,7 +99,8 @@ class Misc(commands.Cog):
             return
     embed=discord.Embed(title=title.content,description=msg.content,color=0xffff00)
     for i in range(times):
-      embed.add_field(name=reactions[i],value=roles[i])
+      role1=discord.utils.get(ctx.guild.roles,id=roles[i])
+      embed.add_field(name=f"React with {reactions[i]} to get the following role",value=f"{reactions[i]} : {role1.mention}",inline=False)
     msg=await channel.send(embed=embed)
     collection=db["rr"]
     dict1={}
